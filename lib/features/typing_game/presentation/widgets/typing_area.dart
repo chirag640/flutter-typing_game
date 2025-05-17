@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:typing/features/typing_game/presentation/bloc/typing/typing_bloc.dart';
 import 'package:typing/features/typing_game/domain/enums/game_mode.dart';
+
 class TypingArea extends StatefulWidget {
   const TypingArea({Key? key}) : super(key: key);
 
@@ -39,7 +40,7 @@ class _TypingAreaState extends State<TypingArea> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Original text to type
+            // Original text to type with highlighted progress
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -47,9 +48,14 @@ class _TypingAreaState extends State<TypingArea> {
                 borderRadius: BorderRadius.circular(8),
               ),
               width: double.infinity,
-              child: Text(
-                state.typingText.originalText,
-                style: const TextStyle(fontSize: 18, height: 1.5),
+              child: RichText(
+                text: TextSpan(
+                  children: _buildTextWithHighlighting(
+                    state.typingText.originalText, 
+                    state.typingText.typedText,
+                  ),
+                  style: const TextStyle(fontSize: 18, height: 1.5, color: Colors.black),
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -80,6 +86,9 @@ class _TypingAreaState extends State<TypingArea> {
                     // Live progress indicator
                     Text('Progress: ${(state.typingText.typedText.length / 
                           (state.typingText.originalText.length > 0 ? state.typingText.originalText.length : 1) * 100).toStringAsFixed(1)}%'),
+                    
+                    // Accuracy indicator
+                    Text('Accuracy: ${_calculateAccuracy(state.typingText.originalText, state.typingText.typedText).toStringAsFixed(1)}%'),
                   ],
                 ),
               ),
@@ -87,5 +96,72 @@ class _TypingAreaState extends State<TypingArea> {
         );
       },
     );
+  }
+  
+  // Build text spans with appropriate coloring
+  List<TextSpan> _buildTextWithHighlighting(String originalText, String typedText) {
+    List<TextSpan> spans = [];
+    
+    for (int i = 0; i < originalText.length; i++) {
+      if (i < typedText.length) {
+        // Character has been typed
+        if (originalText[i] == typedText[i]) {
+          // Correct character
+          spans.add(TextSpan(
+            text: originalText[i],
+            style: const TextStyle(
+              color: Colors.green,
+              fontWeight: FontWeight.bold,
+            ),
+          ));
+        } else {
+          // Incorrect character
+          spans.add(TextSpan(
+            text: originalText[i],
+            style: const TextStyle(
+              color: Colors.red,
+              fontWeight: FontWeight.bold,
+              decoration: TextDecoration.underline,
+            ),
+          ));
+        }
+      } else {
+        // Not yet typed
+        spans.add(TextSpan(
+          text: originalText[i],
+          style: TextStyle(color: Colors.grey[800]),
+        ));
+      }
+    }
+    
+    // Add extra typed characters as errors (if any)
+    if (typedText.length > originalText.length) {
+      spans.add(TextSpan(
+        text: typedText.substring(originalText.length),
+        style: const TextStyle(
+          color: Colors.red,
+          fontWeight: FontWeight.bold,
+          decoration: TextDecoration.underline,
+        ),
+      ));
+    }
+    
+    return spans;
+  }
+  
+  // Calculate typing accuracy
+  double _calculateAccuracy(String originalText, String typedText) {
+    if (typedText.isEmpty) return 100.0;
+    
+    int correctChars = 0;
+    int totalChars = typedText.length;
+    
+    for (int i = 0; i < typedText.length && i < originalText.length; i++) {
+      if (originalText[i] == typedText[i]) {
+        correctChars++;
+      }
+    }
+    
+    return (correctChars / totalChars) * 100;
   }
 }
