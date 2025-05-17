@@ -3,31 +3,51 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:typing/features/typing_game/domain/entities/typing_stats.dart';
 import 'package:typing/features/typing_game/domain/entities/typing_text.dart';
+import 'package:typing/features/typing_game/domain/enums/difficulty.dart';
 
+part 'typing_event.dart';
+part 'typing_state.dart';
 
 class TypingBloc extends Bloc<TypingEvent, TypingState> {
   Timer? _timer;
   int _elapsedSeconds = 0;
   
-  static const List<String> _sampleTexts = [
-    'The quick brown fox jumps over the lazy dog.',
-    'Programming is the art of telling another human what one wants the computer to do.',
-    'Flutter is Google\'s UI toolkit for building beautiful, natively compiled applications for mobile, web, and desktop from a single codebase.',
-    'Life is like riding a bicycle. To keep your balance, you must keep moving.',
-    'The greatest glory in living lies not in never falling, but in rising every time we fall.',
-  ];
+  static const Map<Difficulty, List<String>> _difficultyTexts = {
+    Difficulty.easy: [
+      'The countryside was a patchwork of fields and meadows, with rolling hills stretching out as far as the eye could see.',
+      'I enjoy reading books and watching movies in my free time. What are your favorite hobbies?',
+      'The sun rises in the east and sets in the west. It is a beautiful sight to see.',
+      'My favorite season is spring when flowers bloom and birds sing happily in the trees.',
+      'The small cafe on the corner serves the best coffee and pastries in town.',
+    ],
+    Difficulty.medium: [
+      'Programming requires attention to detail, logical thinking, and problem-solving skills to create efficient solutions.',
+      'Artificial intelligence and machine learning are transforming various industries through automation and data analysis.',
+      'The quantum computer uses qubits instead of bits, allowing for much faster processing of certain complex problems.',
+      'Sustainable development balances economic growth with environmental protection and social inclusion for future generations.',
+      'The cryptocurrency market experiences significant volatility, influenced by regulatory news and technological developments.',
+    ],
+    Difficulty.hard: [
+      'The juxtaposition of paradoxical elements in the quantum realm exemplifies the inexplicable nature of subatomic particles.',
+      'The software developer implemented a sophisticated algorithm utilizing asynchronous processes and multithreading capabilities.',
+      'Pseudopseudohypoparathyroidism is a genetic disorder characterized by end-organ resistance to the action of parathyroid hormone.',
+      'The interdisciplinary approach to climate change mitigation encompasses economic, sociopolitical, and technological innovations.',
+      'The archaeologist\'s meticulous excavation revealed an extraordinary paleolithic artifact with unprecedented hieroglyphic inscriptions.',
+    ],
+  };
 
   TypingBloc() : super(TypingState.initial()) {
     on<StartTypingTest>(_onStartTypingTest);
     on<UpdateTypedText>(_onUpdateTypedText);
     on<FinishTypingTest>(_onFinishTypingTest);
     on<ResetTypingTest>(_onResetTypingTest);
+    on<ChangeDifficulty>(_onChangeDifficulty);
   }
 
   void _onStartTypingTest(StartTypingTest event, Emitter<TypingState> emit) {
     _startTimer();
     
-    final String randomText = _getRandomText();
+    final String randomText = _getRandomText(state.difficulty);
     emit(state.copyWith(
       status: TypingStatus.inProgress,
       typingText: TypingText(originalText: randomText),
@@ -63,11 +83,17 @@ class TypingBloc extends Bloc<TypingEvent, TypingState> {
   void _onResetTypingTest(ResetTypingTest event, Emitter<TypingState> emit) {
     _cancelTimer();
     _elapsedSeconds = 0;
-    emit(TypingState.initial());
+    emit(TypingState.initial().copyWith(difficulty: state.difficulty));
+  }
+  
+  void _onChangeDifficulty(ChangeDifficulty event, Emitter<TypingState> emit) {
+    if (state.status == TypingStatus.initial) {
+      emit(state.copyWith(difficulty: event.difficulty));
+    }
   }
 
-  String _getRandomText() {
-    final texts = List<String>.from(_sampleTexts); // Create a mutable copy
+  String _getRandomText(Difficulty difficulty) {
+    final texts = List<String>.from(_difficultyTexts[difficulty] ?? _difficultyTexts[Difficulty.easy]!);
     texts.shuffle();
     return texts.first;
   }
@@ -122,67 +148,4 @@ class TypingBloc extends Bloc<TypingEvent, TypingState> {
     _cancelTimer();
     return super.close();
   }
-}
-
-class TypingEvent extends Equatable {
-  const TypingEvent();
-
-  @override
-  List<Object> get props => [];
-}
-
-class StartTypingTest extends TypingEvent {}
-
-class UpdateTypedText extends TypingEvent {
-  final String text;
-
-  const UpdateTypedText(this.text);
-
-  @override
-  List<Object> get props => [text];
-}
-
-class FinishTypingTest extends TypingEvent {}
-
-class ResetTypingTest extends TypingEvent {}
-
-
-enum TypingStatus { initial, inProgress, completed }
-
-class TypingState extends Equatable {
-  final TypingStatus status;
-  final TypingText typingText;
-  final DateTime? startTime;
-  final TypingStats? stats;
-
-  const TypingState({
-    required this.status,
-    required this.typingText,
-    this.startTime,
-    this.stats,
-  });
-
-  factory TypingState.initial() {
-    return TypingState(
-      status: TypingStatus.initial,
-      typingText: const TypingText(originalText: ''),
-    );
-  }
-
-  TypingState copyWith({
-    TypingStatus? status,
-    TypingText? typingText,
-    DateTime? startTime,
-    TypingStats? stats,
-  }) {
-    return TypingState(
-      status: status ?? this.status,
-      typingText: typingText ?? this.typingText,
-      startTime: startTime ?? this.startTime,
-      stats: stats ?? this.stats,
-    );
-  }
-
-  @override
-  List<Object?> get props => [status, typingText, startTime, stats];
 }

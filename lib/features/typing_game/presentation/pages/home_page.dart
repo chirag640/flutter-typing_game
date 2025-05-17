@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:typing/features/typing_game/presentation/bloc/theme/theme_bloc.dart';
 import 'package:typing/features/typing_game/presentation/pages/typing_page.dart';
+import 'package:typing/features/typing_game/presentation/widgets/difficulty_selector.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -50,6 +51,8 @@ class HomePage extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 40),
+              const DifficultySelector(),
+              const SizedBox(height: 30),
               ElevatedButton(
                 onPressed: () {
                   Navigator.push(

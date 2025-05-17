@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:typing/features/typing_game/domain/entities/typing_stats.dart';
+import 'package:typing/features/typing_game/domain/enums/difficulty.dart';
 import 'package:typing/features/typing_game/presentation/bloc/typing/typing_bloc.dart';
 import 'package:typing/features/typing_game/presentation/widgets/character_highlight.dart';
 import 'package:typing/features/typing_game/presentation/widgets/stats_display.dart';
@@ -36,7 +36,28 @@ class _TypingPageState extends State<TypingPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Typing Test'),
+        title: BlocBuilder<TypingBloc, TypingState>(
+          builder: (context, state) {
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Typing Test'),
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: state.difficulty.getColor(),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    state.difficulty.name,
+                    style: const TextStyle(fontSize: 12, color: Colors.white),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
       body: BlocConsumer<TypingBloc, TypingState>(
         listener: (context, state) {
