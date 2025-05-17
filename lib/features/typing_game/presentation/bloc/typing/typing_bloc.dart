@@ -206,11 +206,13 @@ class TypingBloc extends Bloc<TypingEvent, TypingState> {
   }
   
   String _getTextWithWordCount(int wordCount, Difficulty difficulty) {
-    final texts = _difficultyTexts[difficulty] ?? _difficultyTexts[Difficulty.easy]!;
+    // Create a mutable copy of the list before shuffling
+    final texts = List<String>.from(_difficultyTexts[difficulty] ?? _difficultyTexts[Difficulty.easy]!);
     String combined = '';
     
     // Keep adding texts until we reach the word count
     while (_countWords(combined) < wordCount) {
+      // Shuffle the mutable list
       texts.shuffle();
       combined += ' ${texts.first}';
     }
