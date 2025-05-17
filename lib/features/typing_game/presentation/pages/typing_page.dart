@@ -1,187 +1,222 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:typing/features/typing_game/domain/enums/difficulty.dart';
 import 'package:typing/features/typing_game/presentation/bloc/typing/typing_bloc.dart';
-import 'package:typing/features/typing_game/presentation/widgets/character_highlight.dart';
-import 'package:typing/features/typing_game/presentation/widgets/stats_display.dart';
+import 'package:typing/features/typing_game/presentation/widgets/typing_area.dart';
+import 'package:typing/features/typing_game/presentation/widgets/results_display.dart';
+import 'package:typing/features/typing_game/domain/enums/game_mode.dart';
+import 'package:typing/features/typing_game/domain/entities/typing_text.dart';
 
 class TypingPage extends StatefulWidget {
-  const TypingPage({super.key});
+  const TypingPage({Key? key}) : super(key: key);
 
   @override
   State<TypingPage> createState() => _TypingPageState();
 }
 
 class _TypingPageState extends State<TypingPage> {
-  final TextEditingController _controller = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
-
-  @override
-  void initState() {
-    super.initState();
-    // Request focus when the page loads
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNode.requestFocus();
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _focusNode.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: BlocBuilder<TypingBloc, TypingState>(
-          builder: (context, state) {
-            return Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('Typing Test'),
-                const SizedBox(width: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: state.difficulty.getColor(),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    state.difficulty.name,
-                    style: const TextStyle(fontSize: 12, color: Colors.white),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-      body: BlocConsumer<TypingBloc, TypingState>(
-        listener: (context, state) {
-          if (state.status == TypingStatus.completed) {
-            _controller.clear();
-          }
-        },
-        builder: (context, state) {
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (state.status == TypingStatus.initial) ...[
-                  _buildInitialState(context),
-                ] else if (state.status == TypingStatus.inProgress) ...[
-                  _buildInProgressState(context, state),
-                ] else if (state.status == TypingStatus.completed) ...[
-                  _buildCompletedState(context, state),
+    return BlocBuilder<TypingBloc, TypingState>(
+      builder: (context, state) {
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(_getAppBarTitle(state)),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                // Reset the typing test if navigating back
+                context.read<TypingBloc>().add(ResetTypingTest());
+                Navigator.of(context).pop();
+              },
+            ),
+          ),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Game status indicator
+                  _buildGameStatusIndicator(context, state),
+                  const SizedBox(height: 16),
+                
+                  // Show appropriate content based on game status
+                  if (state.status == TypingStatus.initial)
+                    _buildStartButton(context)
+                  else if (state.status == TypingStatus.inProgress)
+                    const TypingArea()
+                  else // completed or failed
+                    _buildResultsSection(context, state),
                 ],
-              ],
+              ),
             ),
-          );
-        },
+          ),
+        );
+      },
+    );
+  }
+
+  String _getAppBarTitle(TypingState state) {
+    switch (state.status) {
+      case TypingStatus.initial:
+        return 'Ready to Type';
+      case TypingStatus.inProgress:
+        return 'Typing Test';
+      case TypingStatus.completed:
+        return 'Test Complete';
+      case TypingStatus.failed:
+        return 'Game Over';
+      default:
+        return 'Typing Game';
+    }
+  }
+
+  Widget _buildGameStatusIndicator(BuildContext context, TypingState state) {
+    if (state.status == TypingStatus.initial) {
+      return const SizedBox.shrink();
+    }
+    
+    // Show relevant information based on game mode
+    String statusText = '';
+    Color statusColor = Colors.blue;
+    
+    if (state.status == TypingStatus.inProgress) {
+      switch (state.gameMode) {
+        case GameMode.timed:
+          final minutes = state.remainingSeconds ~/ 60;
+          final seconds = state.remainingSeconds % 60;
+          statusText = 'Time Remaining: $minutes:${seconds.toString().padLeft(2, '0')}';
+          if (state.remainingSeconds < 10) {
+            statusColor = Colors.red;
+          } else if (state.remainingSeconds < 30) {
+            statusColor = Colors.orange;
+          }
+          break;
+        case GameMode.wordCount:
+          final completedWords = _countCompletedWords(state.typingText);
+          final progress = completedWords / state.wordCountTarget;
+          statusText = 'Words: $completedWords / ${state.wordCountTarget}';
+          if (progress > 0.8) {
+            statusColor = Colors.green;
+          } else if (progress > 0.5) {
+            statusColor = Colors.blue;
+          } else {
+            statusColor = Colors.orange;
+          }
+          break;
+        case GameMode.errorSurvival:
+          final errorsLeft = state.errorLimit - state.currentErrorCount;
+          statusText = 'Errors: ${state.currentErrorCount} / ${state.errorLimit}';
+          if (errorsLeft <= 1) {
+            statusColor = Colors.red;
+          } else if (errorsLeft <= 3) {
+            statusColor = Colors.orange;
+          }
+          break;
+        default:
+          final progress = state.typingText.typedText.length / 
+              (state.typingText.originalText.isNotEmpty ? state.typingText.originalText.length : 1);
+          statusText = 'Progress: ${(progress * 100).toInt()}%';
+      }
+    } else {
+      statusText = state.status == TypingStatus.completed ? 'Completed!' : 'Game Over!';
+      statusColor = state.status == TypingStatus.completed ? Colors.green : Colors.red;
+    }
+    
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
+      decoration: BoxDecoration(
+        color: statusColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8.0),
+        border: Border.all(color: statusColor),
+      ),
+      child: Text(
+        statusText,
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: statusColor,
+        ),
+        textAlign: TextAlign.center,
       ),
     );
   }
 
-  Widget _buildInitialState(BuildContext context) {
+  Widget _buildStartButton(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            'Ready to test your typing skills?',
-            style: Theme.of(context).textTheme.titleLarge,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 30),
-          ElevatedButton(
-            onPressed: () {
-              context.read<TypingBloc>().add(StartTypingTest());
-              _focusNode.requestFocus();
-            },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Text('Start Test', style: TextStyle(fontSize: 16)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40.0),
+        child: Column(
+          children: [
+            const Text(
+              'Ready to start the typing test?',
+              style: TextStyle(fontSize: 18),
+              textAlign: TextAlign.center,
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () {
+                context.read<TypingBloc>().add(StartTypingTest());
+              },
+              icon: const Icon(Icons.play_arrow),
+              label: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Text('Start Typing', style: TextStyle(fontSize: 18)),
+              ),
+              style: ElevatedButton.styleFrom(
+                elevation: 4,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildInProgressState(BuildContext context, TypingState state) {
+  Widget _buildResultsSection(BuildContext context, TypingState state) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Card(
-          elevation: 3,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: CharacterHighlight(
-              originalText: state.typingText.originalText,
-              typedText: state.typingText.typedText,
+        const ResultsDisplay(),
+        const SizedBox(height: 24),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton.icon(
+              onPressed: () {
+                context.read<TypingBloc>().add(ResetTypingTest());
+              },
+              icon: const Icon(Icons.replay),
+              label: const Text('Try Again'),
             ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        TextField(
-          controller: _controller,
-          focusNode: _focusNode,
-          autofocus: true,
-          onChanged: (value) {
-            context.read<TypingBloc>().add(UpdateTypedText(value));
-          },
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            hintText: 'Type here...',
-            labelText: 'Typing Area',
-          ),
-          style: const TextStyle(fontSize: 16),
-        ),
-        const SizedBox(height: 20),
-        Center(
-          child: ElevatedButton(
-            onPressed: () {
-              context.read<TypingBloc>().add(FinishTypingTest());
-            },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Text('Finish Test', style: TextStyle(fontSize: 16)),
+            const SizedBox(width: 16),
+            OutlinedButton.icon(
+              onPressed: () {
+                // Reset and navigate back
+                context.read<TypingBloc>().add(ResetTypingTest());
+                Navigator.of(context).pop();
+              },
+              icon: const Icon(Icons.home),
+              label: const Text('Home'),
             ),
-          ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildCompletedState(BuildContext context, TypingState state) {
-    final stats = state.stats!;
+  // Helper method to count completed words
+  int _countCompletedWords(TypingText typingText) {
+    final typedWords = typingText.typedText.trim().split(RegExp(r'\s+'));
+    final originalWords = typingText.originalText.trim().split(RegExp(r'\s+'));
     
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            'Test Completed!',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 20),
-          StatsDisplay(stats: stats),
-          const SizedBox(height: 30),
-          ElevatedButton(
-            onPressed: () {
-              context.read<TypingBloc>().add(ResetTypingTest());
-            },
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: Text('Try Again', style: TextStyle(fontSize: 16)),
-            ),
-          ),
-        ],
-      ),
-    );
+    int completedWords = 0;
+    for (int i = 0; i < typedWords.length && i < originalWords.length; i++) {
+      if (typedWords[i] == originalWords[i]) {
+        completedWords++;
+      }
+    }
+    
+    return completedWords;
   }
 }

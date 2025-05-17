@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:typing/features/typing_game/presentation/bloc/theme/theme_bloc.dart';
 import 'package:typing/features/typing_game/presentation/pages/typing_page.dart';
-import 'package:typing/features/typing_game/presentation/widgets/difficulty_selector.dart';
+import 'package:typing/features/typing_game/presentation/widgets/game_settings_panel.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -33,11 +33,11 @@ class HomePage extends StatelessWidget {
           ),
         ],
       ),
-      body: Center(
+      body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(20.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min, // Don't expand to full height
             children: [
               Text(
                 'Welcome to Typing Game!',
@@ -50,9 +50,8 @@ class HomePage extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyLarge,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 40),
-              const DifficultySelector(),
-              const SizedBox(height: 30),
+              const GameSettingsPanel(),
+              const SizedBox(height: 10),
               ElevatedButton(
                 onPressed: () {
                   Navigator.push(
@@ -70,6 +69,7 @@ class HomePage extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 20), // Add some bottom padding
             ],
           ),
         ),
